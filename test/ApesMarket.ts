@@ -1,11 +1,12 @@
 import { Signer } from "@ethersproject/abstract-signer";
 import { ethers, waffle } from "hardhat";
 
+import ApesMarketArtifact from "../artifacts/contracts/ApesMarket.sol/ApesMarket.json";
 import GreeterArtifact from "../artifacts/contracts/Greeter.sol/Greeter.json";
 
 import { Accounts, Signers } from "../types";
-import { Greeter } from "../typechain/Greeter";
-import { shouldBehaveLikeGreeter } from "./Greeter.behavior";
+import { ApesMarket } from "../typechain/ApesMarket";
+import { expect } from "chai";
 
 const { deployContract } = waffle;
 
@@ -19,12 +20,12 @@ describe("Unit tests", function () {
     this.accounts.admin = await signers[0].getAddress();
   });
 
-  describe("Greeter", function () {
-    beforeEach(async function () {
-      const greeting: string = "Hello, world!";
-      this.greeter = (await deployContract(this.signers.admin, GreeterArtifact, [greeting])) as Greeter;
+  describe("Apes Market", function () {
+    it("should deploy apes market", async function () {
+      this.market = (await deployContract(this.signers.admin, ApesMarketArtifact, [])) as ApesMarket;
+      expect(ethers.utils.isAddress(this.market.address)).to.be.true;
     });
 
-    shouldBehaveLikeGreeter();
+    
   });
 });
