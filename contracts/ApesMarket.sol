@@ -55,7 +55,7 @@ contract ApesMarket {
         bytes32 salt,
         uint256 value,
         string memory metaDataLocation
-    ) external {
+    ) external returns(uint256){
         require(!apeExists[targetAddress], "ApesMarket:: Ape Request already exists");
 
         // Get Ape id
@@ -83,6 +83,8 @@ contract ApesMarket {
 
         // tell everyone
         emit NewDeploymentRequested(id, targetAddress, salt, metaDataLocation, value, msg.sender);
+        return apeIndex.current();
+        
     }
 
     function apeDeploy(uint256 id, bytes memory code) external payable {
@@ -112,6 +114,9 @@ contract ApesMarket {
         allApesByIndex[id].ape = msg.sender;
         allApesByIndex[id].gasUsed = startGas.sub(gasleft());
         allApesByIndex[id].gasPrice = tx.gasprice;
+
+        // call deployed contract to get paid
+        
 
         // tell everyone
         emit NewDeploymentCompleted(
