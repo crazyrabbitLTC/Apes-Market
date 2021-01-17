@@ -10,6 +10,7 @@ import "./tasks/clean";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "solidity-coverage";
+import "hardhat-gas-reporter"
 
 const chainIds = {
   ganache: 1337,
@@ -60,6 +61,11 @@ const config: HardhatUserConfig = {
     kovan: createTestnetConfig("kovan"),
     rinkeby: createTestnetConfig("rinkeby"),
     ropsten: createTestnetConfig("ropsten"),
+  },
+  gasReporter: {
+    coinmarketcap: process.env.COINMARKETCAP,
+    currency: 'EUR',
+    gasPrice: 21
   },
   paths: {
     artifacts: "./artifacts",

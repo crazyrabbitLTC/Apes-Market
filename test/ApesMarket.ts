@@ -36,7 +36,7 @@ describe("Unit tests", function () {
 
   describe("Apes Market", function () {
     it("should deploy apes market", async function () {
-      this.market = (await deployContract(this.signers.admin, ApesMarketArtifact, [])) as ApesMarket;
+      this.market = (await deployContract(this.signers.admin, ApesMarketArtifact, [[this.accounts.admin]])) as ApesMarket;
       expect(ethers.utils.isAddress(this.market.address)).to.be.true;
     });
 

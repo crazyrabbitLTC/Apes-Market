@@ -9,10 +9,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import "./Governance/ApeGovModule.sol";
 
 import "hardhat/console.sol";
 
-contract ApesMarket is ReentrancyGuard{
+contract ApesMarket is ApeGovModule, ReentrancyGuard{
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
     using SafeMath for uint256;
@@ -63,6 +64,8 @@ contract ApesMarket is ReentrancyGuard{
         address payer
     );
 
+    constructor(address[] memory proposersAndExecutors) ApeGovModule(proposersAndExecutors){
+    }
     // Input the target address and the location of the metadata for the byteCode
     function makeApe(
         address targetAddress,
