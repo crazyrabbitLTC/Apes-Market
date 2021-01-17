@@ -5,10 +5,15 @@ pragma solidity ^0.7.0;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Create2.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 
 import "hardhat/console.sol";
 
-contract ApesMarket {
+contract ApesMarket is ReentrancyGuard{
+    using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
     using SafeMath for uint256;
 
@@ -22,6 +27,9 @@ contract ApesMarket {
         address ape;
         uint256 gasUsed;
         uint256 gasPrice;
+        IERC20 paymentToken;
+        uint256 paymentAmount;
+        address payer;
     }
 
     // Ape storage
@@ -37,7 +45,10 @@ contract ApesMarket {
         bytes32 salt,
         string metaData,
         uint256 value,
-        address requestor
+        address requestor,
+        address paymentToken,
+        uint256 paymentAmount,
+        address payer
     );
 
     event NewDeploymentCompleted(
@@ -46,7 +57,10 @@ contract ApesMarket {
         uint256 gasUsed,
         uint256 gasPrice,
         uint256 value,
-        address ape
+        address ape,
+        address paymentToken,
+        uint256 paymentAmount,
+        address payer
     );
 
     // Input the target address and the location of the metadata for the byteCode
@@ -54,8 +68,11 @@ contract ApesMarket {
         address targetAddress,
         bytes32 salt,
         uint256 value,
-        string memory metaDataLocation
-    ) external returns(uint256){
+        string memory metaDataLocation,
+        IERC20 _paymentToken,
+        uint256 _paymentAmount,
+        address _payer
+    ) external returns (uint256) {
         require(!apeExists[targetAddress], "ApesMarket:: Ape Request already exists");
 
         // Get Ape id
@@ -72,6 +89,9 @@ contract ApesMarket {
         newApe.ape = address(0x0);
         newApe.gasUsed = 0;
         newApe.gasPrice = 0;
+        newApe.paymentToken = _paymentToken;
+        newApe.paymentAmount = _paymentAmount;
+        newApe.payer = _payer;
 
         // save ape
         allApesByIndex[id] = newApe;
@@ -82,12 +102,26 @@ contract ApesMarket {
         apeIndex.increment();
 
         // tell everyone
-        emit NewDeploymentRequested(id, targetAddress, salt, metaDataLocation, value, msg.sender);
+        emit NewDeploymentRequested(
+            id,
+            targetAddress,
+            salt,
+            metaDataLocation,
+            value,
+            msg.sender,
+            address(_paymentToken),
+            _paymentAmount,
+            _payer
+        );
         return apeIndex.current();
-        
     }
 
-    function apeDeploy(uint256 id, bytes memory code) external payable {
+    // For this to work, the payment token must have given approval
+    function apeDeploy(
+        uint256 id,
+        bytes memory code,
+        address paymentRecipient
+    ) external nonReentrant payable {
         // Measure Gas
         uint256 startGas = gasleft();
 
@@ -102,6 +136,31 @@ contract ApesMarket {
             require(msg.value == allApesByIndex[id].value, "ApesMarket: Deployment did not receive required Ether");
         }
 
+        // update Ape
+        allApesByIndex[id].deployed = true;
+        allApesByIndex[id].ape = msg.sender;
+        allApesByIndex[id].gasUsed = startGas.sub(gasleft());
+        allApesByIndex[id].gasPrice = tx.gasprice;
+
+        // Avoid stack too deep error
+        {
+            // Apes Market Gets Paid
+            uint256 balanceBefore = allApesByIndex[id].paymentToken.balanceOf(address(this));
+
+            allApesByIndex[id].paymentToken.transferFrom(
+                allApesByIndex[id].payer,
+                address(this),
+                allApesByIndex[id].paymentAmount
+            );
+
+            uint256 balanceAfter = allApesByIndex[id].paymentToken.balanceOf(address(this));
+
+            require(
+                balanceAfter.sub(balanceBefore) == allApesByIndex[id].paymentAmount,
+                "ApesMarket: Where is our money? Ape payment failed."
+            );
+        }
+
         // Check to see deployed address matches the expected address
         address deployed = Create2.deploy(allApesByIndex[id].value, allApesByIndex[id].salt, code);
         require(
@@ -109,14 +168,8 @@ contract ApesMarket {
             "ApesMarket: Deployed contract does not match expected address"
         );
 
-        // update ape
-        allApesByIndex[id].deployed = true;
-        allApesByIndex[id].ape = msg.sender;
-        allApesByIndex[id].gasUsed = startGas.sub(gasleft());
-        allApesByIndex[id].gasPrice = tx.gasprice;
-
-        // call deployed contract to get paid
-        
+        // Split half the tokens with msg.sender
+        allApesByIndex[id].paymentToken.transfer(paymentRecipient, (allApesByIndex[id].paymentAmount).div(2));
 
         // tell everyone
         emit NewDeploymentCompleted(
@@ -125,7 +178,10 @@ contract ApesMarket {
             allApesByIndex[id].gasUsed,
             tx.gasprice,
             allApesByIndex[id].value,
-            msg.sender
+            msg.sender,
+            address(allApesByIndex[id].paymentToken),
+            allApesByIndex[id].value,
+            allApesByIndex[id].payer
         );
     }
 

@@ -1,16 +1,17 @@
+
 import { Signer } from "@ethersproject/abstract-signer";
 import { ethers, waffle } from "hardhat";
 import Web3 from "web3";
 
 import ApesMarketArtifact from "../artifacts/contracts/ApesMarket.sol/ApesMarket.json";
 import GreeterArtifact from "../artifacts/contracts/Greeter.sol/Greeter.json";
+import MockTokenArtifact from "../artifacts/contracts/mocks/MockToken.sol/MOCKTOKEN.json";
 
 import { Accounts, Signers } from "../types";
 import { ApesMarket } from "../typechain/ApesMarket";
+import { MOCKTOKEN } from "../typechain/MOCKTOKEN";
 import { expect } from "chai";
 import { utils } from "ethers";
-import Web3EthAbi from "web3-eth-abi";
-import { string } from "hardhat/internal/core/params/argumentTypes";
 
 const { deployContract } = waffle;
 
@@ -21,10 +22,16 @@ describe("Unit tests", function () {
 
     const signers: Signer[] = await ethers.getSigners();
     this.signers.admin = signers[0];
+    this.signers.tokenDeployer = signers[1];
     this.accounts.admin = await signers[0].getAddress();
+    this.accounts.tokenDeployer = await signers[1].getAddress();
+
+    // Deploy a ERC20 Token
+    this.mockToken = await deployContract(this.signers.tokenDeployer, MockTokenArtifact, []) as MOCKTOKEN;
 
     // setup web3
     this.web3 = new Web3();
+
   });
 
   describe("Apes Market", function () {
@@ -86,7 +93,8 @@ describe("Unit tests", function () {
 
       // Get current Ape Count
       const beforeApeCount = await this.market.apeIndex();
-      await expect(this.market.makeApe(targetAddress, saltHex, value, metaDataLocation)).to.emit(
+
+      await expect(this.market.makeApe(targetAddress, saltHex, value, metaDataLocation, this.mockToken.address, 100, this.accounts.tokenDeployer)).to.emit(
         this.market,
         "NewDeploymentRequested",
       );
@@ -98,6 +106,8 @@ describe("Unit tests", function () {
     });
 
     it("should deploy a pending ape", async function () {
+
+      const market = this.market as ApesMarket;
       // Get bytecode
       const bytecode = GreeterArtifact.bytecode;
 
@@ -110,7 +120,28 @@ describe("Unit tests", function () {
       // ape ID
       const apeId = 0;
 
-      await expect(this.market.apeDeploy(apeId, constructorByteCode)).to.emit(this.market, "NewDeploymentCompleted");
+      // Expect to fail because we haven't permitted the token
+      await expect(market.apeDeploy(apeId, constructorByteCode, this.accounts.admin)).to.be.reverted;
+
+      // Permit the market to take it's payment
+      await this.mockToken.approve(this.market.address, 101);
+
+      const marketBalanceBefore = await this.mockToken.balanceOf(this.market.address);
+      const adminBalanceBefore = await this.mockToken.balanceOf(this.accounts.admin);
+
+      // Deploy contract
+      await expect(market.apeDeploy(apeId, constructorByteCode, this.accounts.admin)).to.emit(this.market, "NewDeploymentCompleted");
+
+      const marketBalanceAfter = await this.mockToken.balanceOf(this.market.address);
+      const adminBalanceAfter = await this.mockToken.balanceOf(this.accounts.admin);
+
+      // The payment is split 50/50
+      expect(marketBalanceAfter).to.equal(adminBalanceAfter);
+
+      // Payment actually took place
+      expect(marketBalanceBefore).to.be.lt(marketBalanceAfter);
+      expect(adminBalanceBefore).to.be.lt(adminBalanceAfter);
+
     });
   });
 });
