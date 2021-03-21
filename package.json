@@ -73,6 +73,8 @@
     "typechain": "hardhat typechain"
   },
   "dependencies": {
+    "@ledgerhq/hw-app-eth": "^5.44.0",
+    "@ledgerhq/hw-transport-node-hid": "^5.43.0",
     "@openzeppelin/contracts": "^3.3.0",
     "@types/web3": "^1.2.2",
     "@types/web3-eth-abi": "^1.2.2",
