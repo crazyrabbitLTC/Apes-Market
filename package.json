@@ -73,7 +73,7 @@
     "typechain": "hardhat typechain"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^3.3.0",
+    "@openzeppelin/contracts": "^4.4.1",
     "@types/web3": "^1.2.2",
     "@types/web3-eth-abi": "^1.2.2",
     "hardhat-gas-reporter": "^1.0.4",
