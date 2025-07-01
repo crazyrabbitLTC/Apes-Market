@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/access/TimelockController.sol";
 
 import "./Governance/ApeGovModule.sol";
 
@@ -24,7 +23,7 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
     bool public isSetup = false;
 
     // Governance //
-    bytes32 public constant TIMELOCK_ROLE = keccak256("TIMELOCK_ROLE");
+    bytes32 public constant SUPER_ADMIN_ROLE = keccak256("SUPER_ADMIN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
 
     // Address of the Ape Token
@@ -43,13 +42,11 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
     uint256 public apeCheckpoint;
     uint256 public apeRewardRatio = 1;
 
-    // Ape Timelock
-
     // Ape Reward
     uint256 public constant apeReward = 25;
 
-    // Address of the timelock
-    TimelockController public timelock;
+    // Address of the super admin
+    address public superAdmin;
 
     struct ApeRequest {
         uint256 id;
@@ -103,20 +100,18 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
 
     event ApeRewarded(address recipient, uint256 amount);
 
-    constructor(
-        uint256 minDelay,
-        address[] memory proposers,
-        address[] memory executors
-    ) {
-        timelock = new TimelockController(minDelay, proposers, executors);
+    constructor(address _superAdmin) {
+        require(_superAdmin != address(0), "Super admin cannot be zero address");
+        
+        superAdmin = _superAdmin;
 
         // Set the roles
         _setupRole(CREATOR_ROLE, msg.sender);
-        _setupRole(TIMELOCK_ROLE, address(timelock));
+        _setupRole(SUPER_ADMIN_ROLE, _superAdmin);
 
-        // Set Timelock as top authority
-        _setRoleAdmin(TIMELOCK_ROLE, TIMELOCK_ROLE);
-        _setRoleAdmin(CREATOR_ROLE, TIMELOCK_ROLE);
+        // Set Super Admin as top authority
+        _setRoleAdmin(SUPER_ADMIN_ROLE, SUPER_ADMIN_ROLE);
+        _setRoleAdmin(CREATOR_ROLE, SUPER_ADMIN_ROLE);
     }
 
     function setupMarket(IERC20 _apeToken) public {
@@ -283,7 +278,7 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
         bytes memory data,
         uint256 value
     ) external payable nonReentrant returns (bytes memory) {
-        require(hasRole(TIMELOCK_ROLE, msg.sender), "Caller does not have timelock Role");
+        require(hasRole(SUPER_ADMIN_ROLE, msg.sender), "Caller does not have super admin Role");
 
         bytes memory returnData =
             target.functionCallWithValue(data, value, "ApeExecute::Error: Unable to execute transaction");

@@ -58,12 +58,8 @@ contract ApesMarketTest is Test {
     );
     
     function setUp() public {
-        // Setup proposers and executors
-        proposersAndExecutors.push(address(this));
-        proposersAndExecutors.push(alice);
-        
-        // Deploy market
-        market = new ApesMarket(3600, proposersAndExecutors, proposersAndExecutors);
+        // Deploy market with this test contract as super admin
+        market = new ApesMarket(address(this));
         
         // Deploy ApeToken to market directly so it has tokens for rewards
         apeToken = new ApeToken(address(market));
@@ -185,14 +181,14 @@ contract ApesMarketTest is Test {
         // Fund the market contract
         vm.deal(address(market), 2 ether);
         
-        // Get timelock address
-        address timelock = address(market.timelock());
+        // Get super admin address (which is this test contract)
+        address superAdmin = address(this);
         
         // The attacker will try to call back into executeTransaction when receiving ETH
         // This should fail due to the nonReentrant modifier
         
         // Try reentrancy attack - send ETH to attacker which triggers receive()
-        vm.startPrank(timelock);
+        vm.startPrank(superAdmin);
         
         // First set the attacker to attacking mode
         bytes memory attackCalldata = abi.encodeWithSignature("attack()");
