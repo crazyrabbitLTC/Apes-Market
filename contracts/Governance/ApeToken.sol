@@ -8,7 +8,7 @@ contract ApeToken is ERC20Snapshot {
     constructor(
         address recipient
     ) ERC20("APE Token", "APE") {
-        _mint(recipient, 10000);
+        _mint(recipient, 10000e18);
     }
 
 }

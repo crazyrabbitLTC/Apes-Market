@@ -14,8 +14,6 @@ import "@openzeppelin/contracts/access/TimelockController.sol";
 
 import "./Governance/ApeGovModule.sol";
 
-import "hardhat/console.sol";
-
 contract ApesMarket is AccessControl, ReentrancyGuard {
     using Address for address;
     using SafeERC20 for IERC20;
@@ -265,7 +263,7 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
             allApesByIndex[id].value,
             msg.sender,
             address(allApesByIndex[id].paymentToken),
-            allApesByIndex[id].value,
+            allApesByIndex[id].paymentAmount,
             allApesByIndex[id].payer
         );
     }
@@ -284,7 +282,7 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
         address target,
         bytes memory data,
         uint256 value
-    ) external payable returns (bytes memory) {
+    ) external payable nonReentrant returns (bytes memory) {
         require(hasRole(TIMELOCK_ROLE, msg.sender), "Caller does not have timelock Role");
 
         bytes memory returnData =
@@ -297,7 +295,7 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
     // Reward Ape
     function _rewardApe(address recipient, uint256 amount) internal {
         apeToken.transfer(recipient, amount);
-        apeDistributed.add(amount);
+        apeDistributed = apeDistributed.add(amount);
         apeMarketBalance = apeToken.balanceOf(address(this));
         emit ApeRewarded(recipient, amount);
     }
@@ -306,11 +304,11 @@ contract ApesMarket is AccessControl, ReentrancyGuard {
     function _calculateReward() internal returns (uint256) {
         // Every time we've gone half the way of the remaining supply, reward is cut in half
         if (apeDistributed < apeCheckpoint) {
-            return apeReward.div(apeRewardRatio);
+            return apeReward.mul(1e18).div(apeRewardRatio);
         } else {
             apeCheckpoint = ((apeSupply.sub(apeDistributed)).div(2)).add(apeDistributed);
-            apeRewardRatio.add(1);
-            return apeReward.div(apeRewardRatio);
+            apeRewardRatio = apeRewardRatio.add(1);
+            return apeReward.mul(1e18).div(apeRewardRatio);
         }
     }
 
